@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>计算器</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: #eef1f5;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .calculator {
+    width: 320px;
+    padding: 20px;
+    border-radius: 24px;
+    background: #1b1d21;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.25);
+  }
+  .display {
+    display: block;
+    width: 100%;
+    min-height: 88px;
+    margin: 0 0 16px;
+    padding: 24px 16px 8px;
+    border-radius: 16px;
+    background: #23262b;
+    color: #f5f6f8;
+    font-size: 40px;
+    font-weight: 300;
+    line-height: 1.2;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+  }
+  .display.small { font-size: 26px; }
+  .keypad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .key {
+    border: 0;
+    border-radius: 16px;
+    padding: 18px 0;
+    font-size: 22px;
+    font-family: inherit;
+    background: #2e3238;
+    color: #f5f6f8;
+    cursor: pointer;
+    transition: filter 0.1s ease, transform 0.05s ease;
+  }
+  .key:hover { filter: brightness(1.15); }
+  .key:active { transform: scale(0.96); }
+  .key.operator { background: #3a3f47; }
+  .key.equals { grid-row: span 2; background: #2563eb; }
+  .key.wide { grid-column: 1 / -1; padding: 16px 0; }
+</style>
+</head>
+<body>
+<main class="calculator">
+  <output id="display" class="display" aria-live="polite">0</output>
+  <div class="keypad" id="keypad">
+    <button type="button" class="key" data-key="7">7</button>
+    <button type="button" class="key" data-key="8">8</button>
+    <button type="button" class="key" data-key="9">9</button>
+    <button type="button" class="key operator" data-key="+">+</button>
+    <button type="button" class="key" data-key="4">4</button>
+    <button type="button" class="key" data-key="5">5</button>
+    <button type="button" class="key" data-key="6">6</button>
+    <button type="button" class="key equals" data-key="=">=</button>
+    <button type="button" class="key" data-key="1">1</button>
+    <button type="button" class="key" data-key="2">2</button>
+    <button type="button" class="key" data-key="3">3</button>
+    <button type="button" class="key wide" data-key="0">0</button>
+  </div>
+</main>
+<script>
+'use strict';
+
+function calculate(leftOperand, operator, rightOperand) {
+  if (operator === '+') {
+    return { ok: true, value: leftOperand + rightOperand };
+  }
+  return { ok: false, error: 'UNSUPPORTED_OPERATOR' };
+}
+
+const ERROR_TEXT = '错误';
+
+const state = {
+  entry: '0',
+  leftOperand: null,
+  operator: null,
+  awaitingRight: false,
+  justEvaluated: false,
+};
+
+function currentValue() {
+  return Number(state.entry);
+}
+
+function enterErrorState() {
+  state.entry = ERROR_TEXT;
+  state.leftOperand = null;
+  state.operator = null;
+  state.awaitingRight = false;
+  state.justEvaluated = true;
+}
+
+function inputDigit(digit) {
+  if (state.awaitingRight || state.justEvaluated) {
+    state.entry = digit;
+    state.awaitingRight = false;
+    state.justEvaluated = false;
+    return;
+  }
+  if (state.entry.length < 15) {
+    state.entry = state.entry === '0' ? digit : state.entry + digit;
+  }
+}
+
+function inputOperator(operator) {
+  if (state.operator !== null) {
+    if (state.awaitingRight) {
+      state.operator = operator;
+      return;
+    }
+    const result = calculate(state.leftOperand, state.operator, currentValue());
+    if (!result.ok) {
+      enterErrorState();
+      return;
+    }
+    state.entry = String(result.value);
+    state.leftOperand = result.value;
+  } else {
+    state.leftOperand = currentValue();
+  }
+  state.operator = operator;
+  state.awaitingRight = true;
+  state.justEvaluated = false;
+}
+
+function inputEquals() {
+  if (state.operator === null) {
+    return;
+  }
+  const result = calculate(state.leftOperand, state.operator, currentValue());
+  if (!result.ok) {
+    enterErrorState();
+    return;
+  }
+  state.entry = String(result.value);
+  state.leftOperand = null;
+  state.operator = null;
+  state.awaitingRight = false;
+  state.justEvaluated = true;
+}
+
+const displayElement = document.getElementById('display');
+const keypadElement = document.getElementById('keypad');
+
+function render() {
+  displayElement.textContent = state.entry;
+  displayElement.classList.toggle('small', state.entry.length > 9);
+}
+
+keypadElement.addEventListener('click', (event) => {
+  const key = event.target.closest('button');
+  if (!key) {
+    return;
+  }
+  const input = key.dataset.key;
+  if (/^[0-9]$/.test(input)) {
+    inputDigit(input);
+  } else if (input === '+') {
+    inputOperator('+');
+  } else if (input === '=') {
+    inputEquals();
+  }
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
